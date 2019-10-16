@@ -7,6 +7,7 @@ using Discord;
 using Discord.WebSocket;
 using Discord.Webhook;
 using System.IO;
+using Discord.Rest;
 
 namespace DiscordMessagePostBot
 {
@@ -88,6 +89,55 @@ namespace DiscordMessagePostBot
                             if (isSuccessful)
                             {
                                 messageDates.Add(date);
+                                var names = listMessage.Content.Split('\n');
+                                var messageToConfirm = (await confirmationChannel.GetMessageAsync(listMessage.Id) as RestUserMessage);
+                                Console.WriteLine("Checking message for new reactions " + messageToConfirm.GetType().Name + names);
+                                if (messageToConfirm != null && messageToConfirm.Reactions.ContainsKey(new Emoji("✅")))
+                                {
+                                    var messageContent = messageToConfirm.Content;
+
+                                    var userConfirmations = await messageToConfirm.GetReactionUsersAsync(new Emoji("✅"), 20).FlattenAsync();
+                                    var reactionsList = userConfirmations.ToList();
+                                    var namesToAdd = new List<string>();
+                                    foreach (var user in reactionsList)
+                                    {
+                                        var socketUser = guild.GetUser(user.Id);
+                                        if (!names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
+                                        {
+
+                                            Console.WriteLine("Found confirmation that wasn't edited in by " + NicknameOrFull(socketUser));
+                                            messageContent += "\n" + NicknameOrFull(socketUser);
+                                        }
+
+                                    }
+                                    await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
+
+
+
+                                    var userWarnings = await messageToConfirm.GetReactionUsersAsync(new Emoji("⚠"), 20).FlattenAsync();
+                                    foreach (var user in userWarnings)
+                                    {
+                                        var socketUser = guild.GetUser(user.Id);
+                                        if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
+                                        {
+                                            Console.WriteLine("Found warning that wasn't edited out by " + NicknameOrFull(socketUser));
+                                            messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
+                                        }
+                                    }
+
+
+                                    var userCancels = await messageToConfirm.GetReactionUsersAsync(new Emoji("❌"), 20).FlattenAsync();
+                                    foreach (var user in userCancels)
+                                    {
+                                        var socketUser = guild.GetUser(user.Id);
+                                        if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
+                                        {
+                                            Console.WriteLine("Found X that wasn't edited out by " + NicknameOrFull(socketUser));
+                                            messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
+                                        }
+                                    }
+
+                                }
 
                             }
                             else
@@ -115,7 +165,7 @@ namespace DiscordMessagePostBot
                             startDate = startDate.AddHours(18.5f);
                             while ((startDate.Date < DateTime.Now + futureLimit))
                             {
-                                
+
                                 startDate = startDate.AddDays(1);
                                 var newDate = startDate.ToString(dateFormat);
                                 var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:\n");
@@ -133,10 +183,15 @@ namespace DiscordMessagePostBot
 
                     }
                 }
-                System.Threading.Thread.Sleep(10000);
+                System.Threading.Thread.Sleep(100);
 
             }
             return Task.CompletedTask;
+        }
+
+        private string NicknameOrFull(SocketGuildUser user)
+        {
+            return !string.IsNullOrEmpty(user.Nickname) ? user.Nickname : user.Username.Split('#')[0];
         }
 
         private async Task<Task> ReactionRemoved(Cacheable<IUserMessage, ulong> arg1, ISocketMessageChannel arg2, SocketReaction arg3)
