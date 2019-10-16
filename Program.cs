@@ -174,7 +174,7 @@ namespace DiscordMessagePostBot
                                 startDate = startDate.AddDays(1);
                                 var newDate = startDate.ToString(dateFormat);
                                 var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:\n");
-                                await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, maybeEmoji });
+                                await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, cancelEmoji });
 
                             }
 
