@@ -63,6 +63,7 @@ namespace DiscordMessagePostBot
             await botAPI.LoginAsync(TokenType.Bot, key);
             await botAPI.StartAsync();
             botAPI.Ready += ClientReady;
+            botAPI.Log += LogMessage;
             Console.WriteLine("Login Status is " + botAPI.LoginState);
             await botAPI.SetStatusAsync(UserStatus.Online);
             botAPI.ReactionAdded += ReactionAdded;
