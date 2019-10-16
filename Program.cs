@@ -17,6 +17,11 @@ namespace DiscordMessagePostBot
         string dateFormat = "dddd MMMM d, h:m tt";
         int numMessagesToGrab = 10;
         DiscordSocketClient botAPI = new DiscordSocketClient();
+        Emoji confirmEmoji = new Emoji("✅");
+        Emoji maybeEmoji = new Emoji("⚠");
+        Emoji cancelEmoji = new Emoji("❌");
+        Emoji goodToGo = new Emoji("🎆");
+
         static void Main(string[] args)
         {
             new Program().MainAsync().GetAwaiter().GetResult();
@@ -92,11 +97,11 @@ namespace DiscordMessagePostBot
                                 var names = listMessage.Content.Split('\n');
                                 var messageToConfirm = (await confirmationChannel.GetMessageAsync(listMessage.Id) as RestUserMessage);
                                 Console.WriteLine("Checking message for new reactions " + messageToConfirm.GetType().Name + names);
-                                if (messageToConfirm != null && messageToConfirm.Reactions.ContainsKey(new Emoji("✅")))
+                                if (messageToConfirm != null && messageToConfirm.Reactions.ContainsKey(confirmEmoji))
                                 {
                                     var messageContent = messageToConfirm.Content;
 
-                                    var userConfirmations = await messageToConfirm.GetReactionUsersAsync(new Emoji("✅"), 20).FlattenAsync();
+                                    var userConfirmations = await messageToConfirm.GetReactionUsersAsync(confirmEmoji, 20).FlattenAsync();
                                     var reactionsList = userConfirmations.ToList();
                                     var namesToAdd = new List<string>();
                                     foreach (var user in reactionsList)
@@ -114,7 +119,7 @@ namespace DiscordMessagePostBot
 
 
 
-                                    var userWarnings = await messageToConfirm.GetReactionUsersAsync(new Emoji("⚠"), 20).FlattenAsync();
+                                    var userWarnings = await messageToConfirm.GetReactionUsersAsync(maybeEmoji, 20).FlattenAsync();
                                     foreach (var user in userWarnings)
                                     {
                                         var socketUser = guild.GetUser(user.Id);
@@ -126,7 +131,7 @@ namespace DiscordMessagePostBot
                                     }
 
 
-                                    var userCancels = await messageToConfirm.GetReactionUsersAsync(new Emoji("❌"), 20).FlattenAsync();
+                                    var userCancels = await messageToConfirm.GetReactionUsersAsync(cancelEmoji, 20).FlattenAsync();
                                     foreach (var user in userCancels)
                                     {
                                         var socketUser = guild.GetUser(user.Id);
@@ -169,7 +174,7 @@ namespace DiscordMessagePostBot
                                 startDate = startDate.AddDays(1);
                                 var newDate = startDate.ToString(dateFormat);
                                 var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:\n");
-                                await newMessage.AddReactionsAsync(new[] { new Emoji("✅"), new Emoji("⚠"), new Emoji("❌") });
+                                await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, maybeEmoji });
 
                             }
 
@@ -199,16 +204,16 @@ namespace DiscordMessagePostBot
             var message = await arg1.GetOrDownloadAsync();
             if (message.Author.Id != botAPI.CurrentUser.Id)
             { return Task.CompletedTask; }
-            var enoughPeople = message.Reactions[new Emoji("✅")].ReactionCount < 9;
+            var enoughPeople = message.Reactions[confirmEmoji].ReactionCount < 9;
             var oldContent = message.Content;
-            if (arg3.Emote.Name == new Emoji("✅").Name)
+            if (arg3.Emote.Name == confirmEmoji.Name)
             {
                 await message.ModifyAsync((x) => x.Content = oldContent.Replace("\n" + arg3.UserId, "").Replace("\n" + arg3.User.ToString(), "").Replace("\n" + ((IGuildUser)arg3.User.Value).Nickname, ""));
             }
 
-            if (enoughPeople && message.Reactions.ContainsKey(new Emoji("🎆")))
+            if (enoughPeople && message.Reactions.ContainsKey(goodToGo))
             {
-                await message.RemoveReactionAsync(new Emoji("🎆"), botAPI.CurrentUser);
+                await message.RemoveReactionAsync(goodToGo, botAPI.CurrentUser);
             }
             return Task.CompletedTask;
         }
@@ -221,7 +226,7 @@ namespace DiscordMessagePostBot
             { return Task.CompletedTask; }
             var oldContent = message.Content;
 
-            if (arg3.Emote.Name != new Emoji("✅").Name && arg3.Emote.Name != new Emoji("⚠").Name && arg3.Emote.Name != new Emoji("❌").Name)
+            if (arg3.Emote.Name != confirmEmoji.Name && arg3.Emote.Name != maybeEmoji.Name && arg3.Emote.Name != cancelEmoji.Name)
             {
                 Console.WriteLine("The emoji wasn't valid");
                 if (arg3.User.IsSpecified)
@@ -231,14 +236,14 @@ namespace DiscordMessagePostBot
 
                 return Task.CompletedTask;
             }
-            if (!oldContent.Contains(((IGuildUser)arg3.User.Value).Nickname) && arg3.Emote.Name == new Emoji("✅").Name)
+            if (!oldContent.Contains(((IGuildUser)arg3.User.Value).Nickname) && arg3.Emote.Name == confirmEmoji.Name)
             {
                 await message.ModifyAsync((x) => x.Content = oldContent + "\n" + ((IGuildUser)arg3.User.Value).Nickname);
             }
-            var enoughPeople = message.Reactions[new Emoji("✅")].ReactionCount > 9;
+            var enoughPeople = message.Reactions[confirmEmoji].ReactionCount > 9;
             if (enoughPeople)
             {
-                await message.AddReactionAsync(new Emoji("🎆"));
+                await message.AddReactionAsync(goodToGo);
             }
             return Task.CompletedTask;
         }
