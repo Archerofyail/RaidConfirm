@@ -88,12 +88,8 @@ namespace DiscordMessagePostBot
                     lastCheckedTime = DateTime.Now;
                     if (ready)
                     {
-                        Console.WriteLine("Checking whether to post new date");
-
-
                         var messages = await confirmationChannel.GetMessagesAsync(numMessagesToGrab).FlattenAsync();
                         Console.WriteLine("Got last " + numMessagesToGrab + " messages");
-
                         var messageList = messages.ToList();
                         var messageDates = new List<DateTime>(messageList.Count);
                         var index = messageList.Count - 1;
@@ -124,12 +120,8 @@ namespace DiscordMessagePostBot
                                             Console.WriteLine("Found confirmation that wasn't edited in by " + NicknameOrFull(socketUser));
                                             messageContent += "\n" + NicknameOrFull(socketUser);
                                         }
-
                                     }
                                     await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
-
-
-
                                     var userWarnings = await messageToConfirm.GetReactionUsersAsync(maybeEmoji, 20).FlattenAsync();
                                     foreach (var user in userWarnings)
                                     {
@@ -141,8 +133,6 @@ namespace DiscordMessagePostBot
                                             messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
                                         }
                                     }
-
-
                                     var userCancels = await messageToConfirm.GetReactionUsersAsync(cancelEmoji, 20).FlattenAsync();
                                     foreach (var user in userCancels)
                                     {
@@ -154,13 +144,7 @@ namespace DiscordMessagePostBot
                                             messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
                                         }
                                     }
-
                                 }
-                                if (!hadToAddReactions)
-                                {
-                                    Console.WriteLine("Already caught up on reactions");
-                                }
-
                             }
                             else
                             {
@@ -168,13 +152,17 @@ namespace DiscordMessagePostBot
                             }
                             index--;
                         }
+                        if (!hadToAddReactions)
+                        {
+                            Console.WriteLine("Already caught up on reactions");
+                        }
 
-
-
+                        Console.WriteLine("Checking whether to post new date");
                         if ((messageDates.Max() - numberOfDaysAhead) < DateTime.Now.Date)
                         {
+                            Console.Write("Most recent date is " + messageDates.Max().ToString(dateFormat));
                             DateTime startDate = DateTime.MinValue;
-                            if (messageDates.Max() < DateTime.Now)
+                            if (messageDates.Max().Date < DateTime.Now.Date)
                             {
                                 startDate = DateTime.Now.Date;
                             }
@@ -184,28 +172,22 @@ namespace DiscordMessagePostBot
                             }
                             startDate = startDate.Date;
                             startDate = startDate.AddHours(18.5f);
-                            while ((startDate.Date < DateTime.Now + numberOfDaysAhead))
+                            while ((startDate.Date < (DateTime.Now + numberOfDaysAhead).Date))
                             {
-
                                 startDate = startDate.AddDays(1);
                                 var newDate = startDate.ToString(dateFormat);
                                 var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:\n");
                                 await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, cancelEmoji });
-
                             }
-
-
                         }
 
                         else
                         {
                             Console.WriteLine("Already caught up on messages");
                         }
-
                     }
                 }
                 System.Threading.Thread.Sleep(100);
-
             }
         }
 
