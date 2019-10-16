@@ -6,6 +6,7 @@ using Discord;
 using Discord.WebSocket;
 using System.IO;
 using Discord.Rest;
+using Newtonsoft.Json;
 
 namespace DiscordMessagePostBot
 {
@@ -19,16 +20,14 @@ namespace DiscordMessagePostBot
         Emoji maybeEmoji = new Emoji("⚠");
         Emoji cancelEmoji = new Emoji("❌");
         Emoji goodToGo = new Emoji("🎆");
-        ulong guildId = 0;
-        ulong confirmationChannelId = 0;
-        List<ulong> usersToNotifyIds = new List<ulong>();
+
         List<SocketUser> usersToNotify = new List<SocketUser>();
         SocketGuild guild;
         SocketTextChannel confirmationChannel;
-        TimeSpan numberOfDaysAhead = TimeSpan.FromDays(7);
+
+        Settings settings;
         static void Main(string[] args)
         {
-
             new Program().MainAsync().GetAwaiter().GetResult();
         }
 
@@ -36,25 +35,24 @@ namespace DiscordMessagePostBot
         {
             try
             {
-                var key = "";
                 try
                 {
-                    using (var keyFile = File.OpenText("key.txt"))
+                    if (File.Exists("settings.json"))
                     {
-                        PostConsoleLine("Grabbing info from file");
-                        key = keyFile.ReadLine();
-                        PostConsoleLine("key is " + key);
-                        guildId = ulong.Parse(keyFile.ReadLine());
-                        PostConsoleLine("guild ID is " + guildId);
-                        confirmationChannelId = ulong.Parse(keyFile.ReadLine());
-                        PostConsoleLine("channel ID is " + confirmationChannelId);
-                        var daysAhead = int.Parse(keyFile.ReadLine());
-                        numberOfDaysAhead = TimeSpan.FromDays(daysAhead);
-                        PostConsoleLine("posting " + daysAhead + " days ahead of today");
-                        var logChannelIds = keyFile.ReadLine().Split(',');
-                        foreach (var chanId in logChannelIds)
+                        using (var settingsFile = File.OpenText("settings.json"))
                         {
-                            this.usersToNotifyIds.Add(ulong.Parse(chanId));
+                            var json = settingsFile.ReadToEnd();
+                            settings = JsonConvert.DeserializeObject<Settings>(json);
+                        }
+                    }
+                    else
+                    {
+                        settings = new Settings();
+                        using (StreamWriter sw = new StreamWriter("settings.json"))
+                        {
+                            sw.WriteLine(JsonConvert.SerializeObject(settings, Formatting.Indented));
+                            Console.WriteLine("New settings.json file created. Please close this and enter all your information first");
+                            Console.ReadKey();
                         }
                     }
                 }
@@ -66,9 +64,10 @@ namespace DiscordMessagePostBot
                 catch (Exception e)
                 {
                     PostConsoleLine("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe");
+
                     return Task.CompletedTask;
                 }
-                await botAPI.LoginAsync(TokenType.Bot, key);
+                await botAPI.LoginAsync(TokenType.Bot, settings.key);
                 await botAPI.StartAsync();
                 botAPI.Ready += ClientReady;
                 botAPI.Log += LogMessage;
@@ -170,7 +169,7 @@ namespace DiscordMessagePostBot
                             }
 
                             PostConsoleLine("Checking whether to post new date");
-                            if ((messageDates.Max() - numberOfDaysAhead) < DateTime.Now.Date)
+                            if ((messageDates.Max() - settings.numberOfDaysAhead) < DateTime.Now.Date)
                             {
                                 Console.Write("Most recent date is " + messageDates.Max().ToString(dateFormat));
                                 DateTime startDate = DateTime.MinValue;
@@ -184,7 +183,7 @@ namespace DiscordMessagePostBot
                                 }
                                 startDate = startDate.Date;
                                 startDate = startDate.AddHours(18.5f);
-                                while ((startDate.Date < (DateTime.Now + numberOfDaysAhead).Date))
+                                while ((startDate.Date < (DateTime.Now + settings.numberOfDaysAhead).Date))
                                 {
                                     startDate = startDate.AddDays(1);
                                     var newDate = startDate.ToString(dateFormat);
@@ -270,11 +269,11 @@ namespace DiscordMessagePostBot
         {
             ready = true;
             PostConsoleLine("Client is ready");
-            guild = botAPI.GetGuild(guildId);
+            guild = botAPI.GetGuild(settings.guildId);
             PostConsoleLine("Got guild with name " + guild.Name);
-            confirmationChannel = guild.GetTextChannel(confirmationChannelId);
+            confirmationChannel = guild.GetTextChannel(settings.confirmationChannelId);
             PostConsoleLine("Got channel " + confirmationChannel.Name);
-            foreach (var chan in usersToNotifyIds)
+            foreach (var chan in settings.usersToNotifyIds)
             {
                 usersToNotify.Add(botAPI.GetUser(chan));
             }

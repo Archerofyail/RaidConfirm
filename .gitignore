@@ -349,3 +349,5 @@ healthchecksdb
 MigrationBackup/
 
 key.txt
+
+settings.json
