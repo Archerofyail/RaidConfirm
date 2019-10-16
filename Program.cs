@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Discord;
 using Discord.WebSocket;
-using Discord.Webhook;
 using System.IO;
 using Discord.Rest;
 
@@ -21,7 +19,8 @@ namespace DiscordMessagePostBot
         Emoji maybeEmoji = new Emoji("⚠");
         Emoji cancelEmoji = new Emoji("❌");
         Emoji goodToGo = new Emoji("🎆");
-
+        ulong guildId = 0;
+        ulong confirmationChannelId = 0;
         static void Main(string[] args)
         {
             new Program().MainAsync().GetAwaiter().GetResult();
@@ -36,15 +35,19 @@ namespace DiscordMessagePostBot
             {
                 using (var keyFile = File.OpenText("key.txt"))
                 {
-
+                    Console.WriteLine("Grabbing info from file");
                     key = keyFile.ReadLine();
-
+                    Console.WriteLine("key is " + key);
+                    guildId = ulong.Parse(keyFile.ReadLine());
+                    Console.WriteLine("guild ID is " + guildId);
+                    confirmationChannelId = ulong.Parse(keyFile.ReadLine());
+                    Console.WriteLine("channel ID is " + confirmationChannelId);
 
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe");
+                Console.WriteLine("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe\nand the guild ID and channel ID are on separate lines with no other characters");
                 return Task.CompletedTask;
             }
             await botAPI.LoginAsync(TokenType.Bot, key);
@@ -71,23 +74,22 @@ namespace DiscordMessagePostBot
                 if ((DateTime.Now) - lastCheckedTime > timeToCheck || pressedC)
                 {
                     pressedC = false;
-
-
                     lastCheckedTime = DateTime.Now;
                     if (ready)
                     {
                         Console.WriteLine("Checking whether to post new date");
-                        var guild = botAPI.GetGuild(532383827239108620);
+                        var guild = botAPI.GetGuild(guildId);
                         Console.WriteLine("Got guild with name " + guild.Name);
-                        var confirmationChannel = guild.GetTextChannel(633817379805331456);
+                        var confirmationChannel = guild.GetTextChannel(confirmationChannelId);
                         Console.WriteLine("Got channel " + confirmationChannel.Name);
 
                         var messages = await confirmationChannel.GetMessagesAsync(numMessagesToGrab).FlattenAsync();
-                        Console.WriteLine("Got last 4 messages");
+                        Console.WriteLine("Got last " + numMessagesToGrab + " messages");
 
                         var messageList = messages.ToList();
                         var messageDates = new List<DateTime>(messageList.Count);
                         var index = messageList.Count - 1;
+                        Console.WriteLine("Checking message for new reactions");
                         foreach (var listMessage in messageList)
                         {
                             var isSuccessful = DateTime.TryParseExact(listMessage.Content.Split('\n')[0], dateFormat, null, System.Globalization.DateTimeStyles.None, out DateTime date);
@@ -96,7 +98,7 @@ namespace DiscordMessagePostBot
                                 messageDates.Add(date);
                                 var names = listMessage.Content.Split('\n');
                                 var messageToConfirm = (await confirmationChannel.GetMessageAsync(listMessage.Id) as RestUserMessage);
-                                Console.WriteLine("Checking message for new reactions " + messageToConfirm.GetType().Name + names);
+
                                 if (messageToConfirm != null && messageToConfirm.Reactions.ContainsKey(confirmEmoji))
                                 {
                                     var messageContent = messageToConfirm.Content;
@@ -191,7 +193,6 @@ namespace DiscordMessagePostBot
                 System.Threading.Thread.Sleep(100);
 
             }
-            return Task.CompletedTask;
         }
 
         private string NicknameOrFull(SocketGuildUser user)
