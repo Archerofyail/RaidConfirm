@@ -184,7 +184,7 @@ namespace DiscordMessagePostBot
 
                         else
                         {
-                            PostConsoleLine("Already caught up on messages");
+                            PostConsoleLine("Already caught up on messages, waiting " + timeToCheck.ToString("%m") + " minutes before checking again");
                         }
                     }
                 }
