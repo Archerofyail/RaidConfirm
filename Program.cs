@@ -21,6 +21,9 @@ namespace DiscordMessagePostBot
         Emoji goodToGo = new Emoji("🎆");
         ulong guildId = 0;
         ulong confirmationChannelId = 0;
+        SocketGuild guild;
+        SocketTextChannel confirmationChannel;
+        TimeSpan numberOfDaysAhead = TimeSpan.FromDays(7);
         static void Main(string[] args)
         {
             new Program().MainAsync().GetAwaiter().GetResult();
@@ -42,12 +45,19 @@ namespace DiscordMessagePostBot
                     Console.WriteLine("guild ID is " + guildId);
                     confirmationChannelId = ulong.Parse(keyFile.ReadLine());
                     Console.WriteLine("channel ID is " + confirmationChannelId);
-
+                    var daysAhead = int.Parse(keyFile.ReadLine());
+                    numberOfDaysAhead = TimeSpan.FromDays(daysAhead);
+                    Console.WriteLine("posting " + daysAhead + " days ahead of today");
                 }
+            }
+            catch (FormatException e)
+            {
+                Console.WriteLine("Error parsing guild or channel IDs. Please make sure they're on their own lines with no other characters");
+                return Task.CompletedTask;
             }
             catch (Exception e)
             {
-                Console.WriteLine("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe\nand the guild ID and channel ID are on separate lines with no other characters");
+                Console.WriteLine("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe");
                 return Task.CompletedTask;
             }
             await botAPI.LoginAsync(TokenType.Bot, key);
@@ -60,6 +70,7 @@ namespace DiscordMessagePostBot
             var timeToCheck = TimeSpan.FromMinutes(1);
             var lastCheckedTime = DateTime.Now;
             var pressedC = false;
+
             while (true)
             {
                 if (Console.KeyAvailable)
@@ -78,10 +89,7 @@ namespace DiscordMessagePostBot
                     if (ready)
                     {
                         Console.WriteLine("Checking whether to post new date");
-                        var guild = botAPI.GetGuild(guildId);
-                        Console.WriteLine("Got guild with name " + guild.Name);
-                        var confirmationChannel = guild.GetTextChannel(confirmationChannelId);
-                        Console.WriteLine("Got channel " + confirmationChannel.Name);
+
 
                         var messages = await confirmationChannel.GetMessagesAsync(numMessagesToGrab).FlattenAsync();
                         Console.WriteLine("Got last " + numMessagesToGrab + " messages");
@@ -90,6 +98,7 @@ namespace DiscordMessagePostBot
                         var messageDates = new List<DateTime>(messageList.Count);
                         var index = messageList.Count - 1;
                         Console.WriteLine("Checking message for new reactions");
+                        var hadToAddReactions = false;
                         foreach (var listMessage in messageList)
                         {
                             var isSuccessful = DateTime.TryParseExact(listMessage.Content.Split('\n')[0], dateFormat, null, System.Globalization.DateTimeStyles.None, out DateTime date);
@@ -111,7 +120,7 @@ namespace DiscordMessagePostBot
                                         var socketUser = guild.GetUser(user.Id);
                                         if (!names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
                                         {
-
+                                            hadToAddReactions = true;
                                             Console.WriteLine("Found confirmation that wasn't edited in by " + NicknameOrFull(socketUser));
                                             messageContent += "\n" + NicknameOrFull(socketUser);
                                         }
@@ -127,6 +136,7 @@ namespace DiscordMessagePostBot
                                         var socketUser = guild.GetUser(user.Id);
                                         if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
                                         {
+                                            hadToAddReactions = true;
                                             Console.WriteLine("Found warning that wasn't edited out by " + NicknameOrFull(socketUser));
                                             messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
                                         }
@@ -139,11 +149,16 @@ namespace DiscordMessagePostBot
                                         var socketUser = guild.GetUser(user.Id);
                                         if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
                                         {
+                                            hadToAddReactions = true;
                                             Console.WriteLine("Found X that wasn't edited out by " + NicknameOrFull(socketUser));
                                             messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
                                         }
                                     }
 
+                                }
+                                if (!hadToAddReactions)
+                                {
+                                    Console.WriteLine("Already caught up on reactions");
                                 }
 
                             }
@@ -156,8 +171,7 @@ namespace DiscordMessagePostBot
 
 
 
-                        var futureLimit = TimeSpan.FromDays(7);
-                        if ((messageDates.Max() - futureLimit) < DateTime.Now.Date)
+                        if ((messageDates.Max() - numberOfDaysAhead) < DateTime.Now.Date)
                         {
                             DateTime startDate = DateTime.MinValue;
                             if (messageDates.Max() < DateTime.Now)
@@ -170,7 +184,7 @@ namespace DiscordMessagePostBot
                             }
                             startDate = startDate.Date;
                             startDate = startDate.AddHours(18.5f);
-                            while ((startDate.Date < DateTime.Now + futureLimit))
+                            while ((startDate.Date < DateTime.Now + numberOfDaysAhead))
                             {
 
                                 startDate = startDate.AddDays(1);
@@ -185,7 +199,7 @@ namespace DiscordMessagePostBot
 
                         else
                         {
-                            Console.WriteLine("Already caught up");
+                            Console.WriteLine("Already caught up on messages");
                         }
 
                     }
@@ -253,6 +267,10 @@ namespace DiscordMessagePostBot
         {
             ready = true;
             Console.WriteLine("Client is ready");
+            guild = botAPI.GetGuild(guildId);
+            Console.WriteLine("Got guild with name " + guild.Name);
+            confirmationChannel = guild.GetTextChannel(confirmationChannelId);
+            Console.WriteLine("Got channel " + confirmationChannel.Name);
             return Task.CompletedTask;
         }
 
