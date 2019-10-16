@@ -21,174 +21,191 @@ namespace DiscordMessagePostBot
         Emoji goodToGo = new Emoji("🎆");
         ulong guildId = 0;
         ulong confirmationChannelId = 0;
+        List<ulong> usersToNotifyIds = new List<ulong>();
+        List<SocketUser> usersToNotify = new List<SocketUser>();
         SocketGuild guild;
         SocketTextChannel confirmationChannel;
         TimeSpan numberOfDaysAhead = TimeSpan.FromDays(7);
         static void Main(string[] args)
         {
+
             new Program().MainAsync().GetAwaiter().GetResult();
         }
 
         public async Task<Task> MainAsync()
         {
-
-            var key = "";
-
             try
             {
-                using (var keyFile = File.OpenText("key.txt"))
+                var key = "";
+                try
                 {
-                    PostConsoleLine("Grabbing info from file");
-                    key = keyFile.ReadLine();
-                    PostConsoleLine("key is " + key);
-                    guildId = ulong.Parse(keyFile.ReadLine());
-                    PostConsoleLine("guild ID is " + guildId);
-                    confirmationChannelId = ulong.Parse(keyFile.ReadLine());
-                    PostConsoleLine("channel ID is " + confirmationChannelId);
-                    var daysAhead = int.Parse(keyFile.ReadLine());
-                    numberOfDaysAhead = TimeSpan.FromDays(daysAhead);
-                    PostConsoleLine("posting " + daysAhead + " days ahead of today");
-                }
-            }
-            catch (FormatException e)
-            {
-                PostConsoleLine("Error parsing guild or channel IDs. Please make sure they're on their own lines with no other characters");
-                return Task.CompletedTask;
-            }
-            catch (Exception e)
-            {
-                PostConsoleLine("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe");
-                return Task.CompletedTask;
-            }
-            await botAPI.LoginAsync(TokenType.Bot, key);
-            await botAPI.StartAsync();
-            botAPI.Ready += ClientReady;
-            botAPI.Log += LogMessage;            
-            PostConsoleLine("Login Status is " + botAPI.LoginState);
-            await botAPI.SetStatusAsync(UserStatus.Online);
-            botAPI.ReactionAdded += ReactionAdded;
-            botAPI.ReactionRemoved += ReactionRemoved;
-            var timeToCheck = TimeSpan.FromMinutes(5);
-            var lastCheckedTime = DateTime.Now;
-            var pressedC = false;
-
-            while (true)
-            {
-                if (Console.KeyAvailable)
-                {
-                    var cKey = Console.ReadKey().Key;
-                    if (cKey == ConsoleKey.C)
+                    using (var keyFile = File.OpenText("key.txt"))
                     {
-                        pressedC = true;
-                    }
-
-                }
-                if ((DateTime.Now) - lastCheckedTime > timeToCheck || pressedC)
-                {
-                    pressedC = false;
-                    lastCheckedTime = DateTime.Now;
-                    if (ready)
-                    {
-                        var messages = await confirmationChannel.GetMessagesAsync(numMessagesToGrab).FlattenAsync();
-                        PostConsoleLine("Got last " + numMessagesToGrab + " messages");
-                        var messageList = messages.ToList();
-                        var messageDates = new List<DateTime>(messageList.Count);
-                        var index = messageList.Count - 1;
-                        PostConsoleLine("Checking message for new reactions");
-                        var hadToAddReactions = false;
-                        foreach (var listMessage in messageList)
+                        PostConsoleLine("Grabbing info from file");
+                        key = keyFile.ReadLine();
+                        PostConsoleLine("key is " + key);
+                        guildId = ulong.Parse(keyFile.ReadLine());
+                        PostConsoleLine("guild ID is " + guildId);
+                        confirmationChannelId = ulong.Parse(keyFile.ReadLine());
+                        PostConsoleLine("channel ID is " + confirmationChannelId);
+                        var daysAhead = int.Parse(keyFile.ReadLine());
+                        numberOfDaysAhead = TimeSpan.FromDays(daysAhead);
+                        PostConsoleLine("posting " + daysAhead + " days ahead of today");
+                        var logChannelIds = keyFile.ReadLine().Split(',');
+                        foreach (var chanId in logChannelIds)
                         {
-                            var isSuccessful = DateTime.TryParseExact(listMessage.Content.Split('\n')[0], dateFormat, null, System.Globalization.DateTimeStyles.None, out DateTime date);
-                            if (isSuccessful)
+                            this.usersToNotifyIds.Add(ulong.Parse(chanId));
+                        }
+                    }
+                }
+                catch (FormatException e)
+                {
+                    PostConsoleLine("Error parsing guild or channel IDs. Please make sure they're on their own lines with no other characters");
+                    return Task.CompletedTask;
+                }
+                catch (Exception e)
+                {
+                    PostConsoleLine("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe");
+                    return Task.CompletedTask;
+                }
+                await botAPI.LoginAsync(TokenType.Bot, key);
+                await botAPI.StartAsync();
+                botAPI.Ready += ClientReady;
+                botAPI.Log += LogMessage;
+                PostConsoleLine("Login Status is " + botAPI.LoginState);
+                await botAPI.SetStatusAsync(UserStatus.Online);
+                botAPI.ReactionAdded += ReactionAdded;
+                botAPI.ReactionRemoved += ReactionRemoved;
+                var timeToCheck = TimeSpan.FromMinutes(5);
+                var lastCheckedTime = DateTime.Now;
+                var pressedC = false;
+
+                while (true)
+                {
+                    if (Console.KeyAvailable)
+                    {
+                        var cKey = Console.ReadKey().Key;
+                        if (cKey == ConsoleKey.C)
+                        {
+                            pressedC = true;
+                        }
+                    }
+                    if ((DateTime.Now) - lastCheckedTime > timeToCheck || pressedC)
+                    {
+                        pressedC = false;
+                        lastCheckedTime = DateTime.Now;
+                        if (ready)
+                        {
+                            var messages = await confirmationChannel.GetMessagesAsync(numMessagesToGrab).FlattenAsync();
+                            PostConsoleLine("Got last " + numMessagesToGrab + " messages");
+                            var messageList = messages.ToList();
+                            var messageDates = new List<DateTime>(messageList.Count);
+                            var index = messageList.Count - 1;
+                            PostConsoleLine("Checking message for new reactions");
+                            var hadToAddReactions = false;
+                            foreach (var listMessage in messageList)
                             {
-                                messageDates.Add(date);
-                                var names = listMessage.Content.Split('\n');
-                                var messageToConfirm = (await confirmationChannel.GetMessageAsync(listMessage.Id) as RestUserMessage);
-
-                                if (messageToConfirm != null && messageToConfirm.Reactions.ContainsKey(confirmEmoji))
+                                var isSuccessful = DateTime.TryParseExact(listMessage.Content.Split('\n')[0], dateFormat, null, System.Globalization.DateTimeStyles.None, out DateTime date);
+                                if (isSuccessful)
                                 {
-                                    var messageContent = messageToConfirm.Content;
+                                    messageDates.Add(date);
+                                    var names = listMessage.Content.Split('\n');
+                                    var messageToConfirm = (await confirmationChannel.GetMessageAsync(listMessage.Id) as RestUserMessage);
 
-                                    var userConfirmations = await messageToConfirm.GetReactionUsersAsync(confirmEmoji, 20).FlattenAsync();
-                                    var reactionsList = userConfirmations.ToList();
-                                    var namesToAdd = new List<string>();
-                                    foreach (var user in reactionsList)
-                                    {                                        
-                                        var socketUser = guild.GetUser(user.Id);
-                                        if (!names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
-                                        {
-                                            hadToAddReactions = true;
-                                            PostConsoleLine("Found confirmation that wasn't edited in by " + NicknameOrFull(socketUser));
-                                            messageContent += "\n" + NicknameOrFull(socketUser);
-                                        }
-                                    }
-                                    await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
-                                    var userWarnings = await messageToConfirm.GetReactionUsersAsync(maybeEmoji, 20).FlattenAsync();
-                                    foreach (var user in userWarnings)
+                                    if (messageToConfirm != null && messageToConfirm.Reactions.ContainsKey(confirmEmoji))
                                     {
-                                        var socketUser = guild.GetUser(user.Id);
-                                        if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
+                                        var messageContent = messageToConfirm.Content;
+                                        var userConfirmations = await messageToConfirm.GetReactionUsersAsync(confirmEmoji, 20).FlattenAsync();
+                                        var reactionsList = userConfirmations.ToList();
+                                        var namesToAdd = new List<string>();
+                                        messageContent = messageContent.Replace("\n\n\n", "\n");
+                                        foreach (var user in reactionsList)
                                         {
-                                            hadToAddReactions = true;
-                                            PostConsoleLine("Found warning that wasn't edited out by " + NicknameOrFull(socketUser));
-                                            messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
+                                            var socketUser = guild.GetUser(user.Id);
+                                            if (!names.Contains("**" + NicknameOrFull(socketUser) + "**") && (user.Id != botAPI.CurrentUser.Id))
+                                            {
+                                                hadToAddReactions = true;
+                                                if (names.Contains(NicknameOrFull(socketUser)))
+                                                {
+                                                    messageContent = messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
+                                                }
+                                                PostConsoleLine("Found confirmation that wasn't edited in by " + NicknameOrFull(socketUser));
+                                                messageContent += "\n**" + NicknameOrFull(socketUser) + "**";
+                                            }
                                         }
-                                    }
-                                    var userCancels = await messageToConfirm.GetReactionUsersAsync(cancelEmoji, 20).FlattenAsync();
-                                    foreach (var user in userCancels)
-                                    {
-                                        var socketUser = guild.GetUser(user.Id);
-                                        if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
+                                        await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
+                                        var userWarnings = await messageToConfirm.GetReactionUsersAsync(maybeEmoji, 20).FlattenAsync();
+                                        foreach (var user in userWarnings)
                                         {
-                                            hadToAddReactions = true;
-                                            PostConsoleLine("Found X that wasn't edited out by " + NicknameOrFull(socketUser));
-                                            messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
+                                            var socketUser = guild.GetUser(user.Id);
+                                            if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
+                                            {
+                                                hadToAddReactions = true;
+                                                PostConsoleLine("Found warning that wasn't edited out by " + NicknameOrFull(socketUser));
+                                                messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
+                                            }
+                                        }
+                                        var userCancels = await messageToConfirm.GetReactionUsersAsync(cancelEmoji, 20).FlattenAsync();
+                                        foreach (var user in userCancels)
+                                        {
+                                            var socketUser = guild.GetUser(user.Id);
+                                            if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
+                                            {
+                                                hadToAddReactions = true;
+                                                PostConsoleLine("Found X that wasn't edited out by " + NicknameOrFull(socketUser));
+                                                messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
+                                            }
                                         }
                                     }
                                 }
+                                else
+                                {
+                                    messageDates.Add(DateTime.MinValue + TimeSpan.FromDays(50));
+                                }
+                                index--;
                             }
+                            if (!hadToAddReactions)
+                            {
+                                PostConsoleLine("Already caught up on reactions");
+                            }
+
+                            PostConsoleLine("Checking whether to post new date");
+                            if ((messageDates.Max() - numberOfDaysAhead) < DateTime.Now.Date)
+                            {
+                                Console.Write("Most recent date is " + messageDates.Max().ToString(dateFormat));
+                                DateTime startDate = DateTime.MinValue;
+                                if (messageDates.Max().Date < DateTime.Now.Date)
+                                {
+                                    startDate = DateTime.Now.Date;
+                                }
+                                else
+                                {
+                                    startDate = messageDates.Max();
+                                }
+                                startDate = startDate.Date;
+                                startDate = startDate.AddHours(18.5f);
+                                while ((startDate.Date < (DateTime.Now + numberOfDaysAhead).Date))
+                                {
+                                    startDate = startDate.AddDays(1);
+                                    var newDate = startDate.ToString(dateFormat);
+                                    var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:\n");
+                                    await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, cancelEmoji });
+                                }
+                            }
+
                             else
                             {
-                                messageDates.Add(DateTime.MinValue + TimeSpan.FromDays(50));
+                                PostConsoleLine("Already caught up on messages, waiting " + timeToCheck.ToString("%m") + " minutes before checking again");
                             }
-                            index--;
-                        }
-                        if (!hadToAddReactions)
-                        {
-                            PostConsoleLine("Already caught up on reactions");
-                        }
-
-                        PostConsoleLine("Checking whether to post new date");
-                        if ((messageDates.Max() - numberOfDaysAhead) < DateTime.Now.Date)
-                        {
-                            Console.Write("Most recent date is " + messageDates.Max().ToString(dateFormat));
-                            DateTime startDate = DateTime.MinValue;
-                            if (messageDates.Max().Date < DateTime.Now.Date)
-                            {
-                                startDate = DateTime.Now.Date;
-                            }
-                            else
-                            {
-                                startDate = messageDates.Max();
-                            }
-                            startDate = startDate.Date;
-                            startDate = startDate.AddHours(18.5f);
-                            while ((startDate.Date < (DateTime.Now + numberOfDaysAhead).Date))
-                            {
-                                startDate = startDate.AddDays(1);
-                                var newDate = startDate.ToString(dateFormat);
-                                var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:\n");
-                                await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, cancelEmoji });
-                            }
-                        }
-
-                        else
-                        {
-                            PostConsoleLine("Already caught up on messages, waiting " + timeToCheck.ToString("%m") + " minutes before checking again");
                         }
                     }
+                    System.Threading.Thread.Sleep(100);
                 }
-                System.Threading.Thread.Sleep(100);
+            }
+            catch (Exception e)
+            {
+                PostConsoleLine("Error occurred: " + e.Message + "\nStack Trace:\n" + e.StackTrace, true);
+                return Task.CompletedTask;
             }
         }
 
@@ -206,7 +223,10 @@ namespace DiscordMessagePostBot
             var oldContent = message.Content;
             if (arg3.Emote.Name == confirmEmoji.Name)
             {
-                await message.ModifyAsync((x) => x.Content = oldContent.Replace("\n" + arg3.UserId, "").Replace("\n" + arg3.User.ToString(), "").Replace("\n" + ((IGuildUser)arg3.User.Value).Nickname, ""));
+                await message.ModifyAsync((x) => x.Content = oldContent.Replace("\n**" + arg3.UserId + "**", "")
+                .Replace("\n" + arg3.User.ToString(), "")
+                .Replace("\n" + ((IGuildUser)arg3.User.Value).Nickname, "")
+                .Replace("\n**" + ((IGuildUser)arg3.User.Value).Nickname + "**", ""));
             }
 
             if (enoughPeople && message.Reactions.ContainsKey(goodToGo))
@@ -236,7 +256,7 @@ namespace DiscordMessagePostBot
             }
             if (arg3.User.IsSpecified && !oldContent.Contains(((IGuildUser)arg3.User.Value).Nickname) && arg3.Emote.Name == confirmEmoji.Name)
             {
-                await message.ModifyAsync((x) => x.Content = oldContent + "\n" + ((IGuildUser)arg3.User.Value).Nickname);
+                await message.ModifyAsync((x) => x.Content = oldContent + "\n**" + ((IGuildUser)arg3.User.Value).Nickname + "**");
             }
             var enoughPeople = message.Reactions[confirmEmoji].ReactionCount > 9;
             if (enoughPeople)
@@ -246,7 +266,7 @@ namespace DiscordMessagePostBot
             return Task.CompletedTask;
         }
 
-        private Task ClientReady()
+        private async Task<Task> ClientReady()
         {
             ready = true;
             PostConsoleLine("Client is ready");
@@ -254,6 +274,11 @@ namespace DiscordMessagePostBot
             PostConsoleLine("Got guild with name " + guild.Name);
             confirmationChannel = guild.GetTextChannel(confirmationChannelId);
             PostConsoleLine("Got channel " + confirmationChannel.Name);
+            foreach (var chan in usersToNotifyIds)
+            {
+                usersToNotify.Add(botAPI.GetUser(chan));
+            }
+
             return Task.CompletedTask;
         }
 
@@ -263,8 +288,15 @@ namespace DiscordMessagePostBot
             return Task.CompletedTask;
         }
 
-        void PostConsoleLine(string message)
+        void PostConsoleLine(string message, bool postMessageToDiscordLog = false)
         {
+            if (postMessageToDiscordLog)
+            {
+                foreach (var channel in usersToNotify)
+                {
+                    channel.SendMessageAsync(message);
+                }
+            }
             Console.WriteLine(DateTime.Now.ToString("H:mm:ss") + " " + message);
         }
     }
