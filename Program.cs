@@ -1,0 +1,204 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Discord;
+using Discord.WebSocket;
+using Discord.Webhook;
+using System.IO;
+
+namespace DiscordMessagePostBot
+{
+    class Program
+    {
+        bool ready = false;
+        string dateFormat = "dddd MMMM d, h:m tt";
+        int numMessagesToGrab = 10;
+        DiscordSocketClient botAPI = new DiscordSocketClient();
+        static void Main(string[] args)
+        {
+            new Program().MainAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task<Task> MainAsync()
+        {
+
+            var key = "";
+
+            try
+            {
+                using (var keyFile = File.OpenText("key.txt"))
+                {
+
+                    key = keyFile.ReadLine();
+
+
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe");
+                return Task.CompletedTask;
+            }
+            await botAPI.LoginAsync(TokenType.Bot, key);
+            await botAPI.StartAsync();
+            botAPI.Ready += ClientReady;
+            Console.WriteLine("Login Status is " + botAPI.LoginState);
+            await botAPI.SetStatusAsync(UserStatus.Online);
+            botAPI.ReactionAdded += ReactionAdded;
+            botAPI.ReactionRemoved += ReactionRemoved;
+            var timeToCheck = TimeSpan.FromMinutes(1);
+            var lastCheckedTime = DateTime.Now;
+            var pressedC = false;
+            while (true)
+            {
+                if (Console.KeyAvailable)
+                {
+                    var cKey = Console.ReadKey().Key;
+                    if (cKey == ConsoleKey.C)
+                    {
+                        pressedC = true;
+                    }
+
+                }
+                if ((DateTime.Now) - lastCheckedTime > timeToCheck || pressedC)
+                {
+                    pressedC = false;
+
+
+                    lastCheckedTime = DateTime.Now;
+                    if (ready)
+                    {
+                        Console.WriteLine("Checking whether to post new date");
+                        var guild = botAPI.GetGuild(532383827239108620);
+                        Console.WriteLine("Got guild with name " + guild.Name);
+                        var confirmationChannel = guild.GetTextChannel(633817379805331456);
+                        Console.WriteLine("Got channel " + confirmationChannel.Name);
+
+                        var messages = await confirmationChannel.GetMessagesAsync(numMessagesToGrab).FlattenAsync();
+                        Console.WriteLine("Got last 4 messages");
+
+                        var messageList = messages.ToList();
+                        var messageDates = new List<DateTime>(messageList.Count);
+                        var index = messageList.Count - 1;
+                        foreach (var listMessage in messageList)
+                        {
+                            var isSuccessful = DateTime.TryParseExact(listMessage.Content.Split('\n')[0], dateFormat, null, System.Globalization.DateTimeStyles.None, out DateTime date);
+                            if (isSuccessful)
+                            {
+                                messageDates.Add(date);
+
+                            }
+                            else
+                            {
+                                messageDates.Add(DateTime.MinValue + TimeSpan.FromDays(50));
+                            }
+                            index--;
+                        }
+
+
+
+                        var futureLimit = TimeSpan.FromDays(7);
+                        if ((messageDates.Max() - futureLimit) < DateTime.Now.Date)
+                        {
+                            DateTime startDate = DateTime.MinValue;
+                            if (messageDates.Max() < DateTime.Now)
+                            {
+                                startDate = DateTime.Now.Date;
+                            }
+                            else
+                            {
+                                startDate = messageDates.Max();
+                            }
+                            startDate = startDate.Date;
+                            startDate = startDate.AddHours(18.5f);
+                            while ((startDate.Date < DateTime.Now + futureLimit))
+                            {
+                                
+                                startDate = startDate.AddDays(1);
+                                var newDate = startDate.ToString(dateFormat);
+                                var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:\n");
+                                await newMessage.AddReactionsAsync(new[] { new Emoji("✅"), new Emoji("⚠"), new Emoji("❌") });
+
+                            }
+
+
+                        }
+
+                        else
+                        {
+                            Console.WriteLine("Already caught up");
+                        }
+
+                    }
+                }
+                System.Threading.Thread.Sleep(10000);
+
+            }
+            return Task.CompletedTask;
+        }
+
+        private async Task<Task> ReactionRemoved(Cacheable<IUserMessage, ulong> arg1, ISocketMessageChannel arg2, SocketReaction arg3)
+        {
+            var message = await arg1.GetOrDownloadAsync();
+            if (message.Author.Id != botAPI.CurrentUser.Id)
+            { return Task.CompletedTask; }
+            var enoughPeople = message.Reactions[new Emoji("✅")].ReactionCount < 9;
+            var oldContent = message.Content;
+            if (arg3.Emote.Name == new Emoji("✅").Name)
+            {
+                await message.ModifyAsync((x) => x.Content = oldContent.Replace("\n" + arg3.UserId, "").Replace("\n" + arg3.User.ToString(), "").Replace("\n" + ((IGuildUser)arg3.User.Value).Nickname, ""));
+            }
+
+            if (enoughPeople && message.Reactions.ContainsKey(new Emoji("🎆")))
+            {
+                await message.RemoveReactionAsync(new Emoji("🎆"), botAPI.CurrentUser);
+            }
+            return Task.CompletedTask;
+        }
+
+        private async Task<Task> ReactionAdded(Cacheable<IUserMessage, ulong> arg1, ISocketMessageChannel arg2, SocketReaction arg3)
+        {
+
+            var message = await arg1.GetOrDownloadAsync();
+            if (message.Author.Id != botAPI.CurrentUser.Id)
+            { return Task.CompletedTask; }
+            var oldContent = message.Content;
+
+            if (arg3.Emote.Name != new Emoji("✅").Name && arg3.Emote.Name != new Emoji("⚠").Name && arg3.Emote.Name != new Emoji("❌").Name)
+            {
+                Console.WriteLine("The emoji wasn't valid");
+                if (arg3.User.IsSpecified)
+                {
+                    await message.RemoveReactionAsync(arg3.Emote, arg3.User.Value);
+                }
+
+                return Task.CompletedTask;
+            }
+            if (!oldContent.Contains(((IGuildUser)arg3.User.Value).Nickname) && arg3.Emote.Name == new Emoji("✅").Name)
+            {
+                await message.ModifyAsync((x) => x.Content = oldContent + "\n" + ((IGuildUser)arg3.User.Value).Nickname);
+            }
+            var enoughPeople = message.Reactions[new Emoji("✅")].ReactionCount > 9;
+            if (enoughPeople)
+            {
+                await message.AddReactionAsync(new Emoji("🎆"));
+            }
+            return Task.CompletedTask;
+        }
+
+        private Task ClientReady()
+        {
+            ready = true;
+            Console.WriteLine("Client is ready");
+            return Task.CompletedTask;
+        }
+
+        async Task<Task> LogMessage(LogMessage log)
+        {
+            Console.WriteLine(log.ToString());
+            return Task.CompletedTask;
+        }
+    }
+}
