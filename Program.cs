@@ -68,7 +68,7 @@ namespace DiscordMessagePostBot
             await botAPI.SetStatusAsync(UserStatus.Online);
             botAPI.ReactionAdded += ReactionAdded;
             botAPI.ReactionRemoved += ReactionRemoved;
-            var timeToCheck = TimeSpan.FromMinutes(1);
+            var timeToCheck = TimeSpan.FromMinutes(5);
             var lastCheckedTime = DateTime.Now;
             var pressedC = false;
 
@@ -234,7 +234,7 @@ namespace DiscordMessagePostBot
 
                 return Task.CompletedTask;
             }
-            if (!oldContent.Contains(((IGuildUser)arg3.User.Value).Nickname) && arg3.Emote.Name == confirmEmoji.Name)
+            if (arg3.User.IsSpecified && !oldContent.Contains(((IGuildUser)arg3.User.Value).Nickname) && arg3.Emote.Name == confirmEmoji.Name)
             {
                 await message.ModifyAsync((x) => x.Content = oldContent + "\n" + ((IGuildUser)arg3.User.Value).Nickname);
             }
