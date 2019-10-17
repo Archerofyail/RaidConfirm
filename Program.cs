@@ -118,7 +118,7 @@ namespace DiscordMessagePostBot
                                         var messageContent = messageToConfirm.Content;
                                         var userConfirmations = await messageToConfirm.GetReactionUsersAsync(confirmEmoji, 20).FlattenAsync();
                                         var reactionsList = userConfirmations.ToList();
-                                        var namesToAdd = new List<string>();                                        
+                                        var namesToAdd = new List<string>();
                                         foreach (var user in reactionsList)
                                         {
                                             var socketUser = guild.GetUser(user.Id);
@@ -133,8 +133,8 @@ namespace DiscordMessagePostBot
                                                 messageContent += "\n**" + NicknameOrFull(socketUser) + "**";
                                             }
                                         }
-                                        Thread.Sleep(10);
-                                        await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
+                                        Thread.Sleep(100);
+
                                         var userWarnings = await messageToConfirm.GetReactionUsersAsync(maybeEmoji, 20).FlattenAsync();
                                         foreach (var user in userWarnings)
                                         {
@@ -146,7 +146,7 @@ namespace DiscordMessagePostBot
                                                 messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
                                             }
                                         }
-                                        Thread.Sleep(10);
+                                        Thread.Sleep(100);
                                         var userCancels = await messageToConfirm.GetReactionUsersAsync(cancelEmoji, 20).FlattenAsync();
                                         foreach (var user in userCancels)
                                         {
@@ -158,6 +158,7 @@ namespace DiscordMessagePostBot
                                                 messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
                                             }
                                         }
+                                        await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
                                     }
                                 }
                                 else
@@ -165,7 +166,7 @@ namespace DiscordMessagePostBot
                                     messageDates.Add(DateTime.MinValue + TimeSpan.FromDays(50));
                                 }
                                 index--;
-                                Thread.Sleep(10);
+                                Thread.Sleep(100);
                             }
                             if (!hadToAddReactions)
                             {
@@ -217,19 +218,19 @@ namespace DiscordMessagePostBot
             return !string.IsNullOrEmpty(user.Nickname) ? user.Nickname : user.Username.Split('#')[0];
         }
 
-        private async Task<Task> ReactionRemoved(Cacheable<IUserMessage, ulong> arg1, ISocketMessageChannel arg2, SocketReaction arg3)
+        private async Task<Task> ReactionRemoved(Cacheable<IUserMessage, ulong> messagePromise, ISocketMessageChannel channel, SocketReaction reaction)
         {
-            var message = await arg1.GetOrDownloadAsync();
+            var message = await messagePromise.GetOrDownloadAsync();
             if (message.Author.Id != botAPI.CurrentUser.Id)
             { return Task.CompletedTask; }
             var enoughPeople = message.Reactions[confirmEmoji].ReactionCount < 9;
             var oldContent = message.Content;
-            if (arg3.Emote.Name == confirmEmoji.Name)
+            if (reaction.Emote.Name == confirmEmoji.Name)
             {
-                await message.ModifyAsync((x) => x.Content = oldContent.Replace("\n**" + arg3.UserId + "**", "")
-                .Replace("\n" + arg3.User.ToString(), "")
-                .Replace("\n" + ((IGuildUser)arg3.User.Value).Nickname, "")
-                .Replace("\n**" + ((IGuildUser)arg3.User.Value).Nickname + "**", ""));
+                await message.ModifyAsync((x) => x.Content = oldContent.Replace("\n**" + reaction.UserId + "**", "")
+                .Replace("\n" + reaction.User.ToString(), "")
+                .Replace("\n" + ((IGuildUser)reaction.User.Value).Nickname, "")
+                .Replace("\n**" + ((IGuildUser)reaction.User.Value).Nickname + "**", ""));
             }
 
             if (enoughPeople && message.Reactions.ContainsKey(goodToGo))
@@ -239,33 +240,34 @@ namespace DiscordMessagePostBot
             return Task.CompletedTask;
         }
 
-        private async Task<Task> ReactionAdded(Cacheable<IUserMessage, ulong> arg1, ISocketMessageChannel arg2, SocketReaction arg3)
+        private async Task<Task> ReactionAdded(Cacheable<IUserMessage, ulong> messagePromise, ISocketMessageChannel channel, SocketReaction reaction)
         {
 
-            var message = await arg1.GetOrDownloadAsync();
+            var message = await messagePromise.GetOrDownloadAsync();
+
             if (message.Author.Id != botAPI.CurrentUser.Id)
             { return Task.CompletedTask; }
             var oldContent = message.Content;
 
-            if (arg3.Emote.Name != confirmEmoji.Name && arg3.Emote.Name != maybeEmoji.Name && arg3.Emote.Name != cancelEmoji.Name)
+            if (reaction.Emote.Name != confirmEmoji.Name && reaction.Emote.Name != maybeEmoji.Name && reaction.Emote.Name != cancelEmoji.Name)
             {
                 PostConsoleLine("The emoji wasn't valid");
-                if (arg3.User.IsSpecified)
+                if (reaction.User.IsSpecified)
                 {
-                    await message.RemoveReactionAsync(arg3.Emote, arg3.User.Value);
+                    await message.RemoveReactionAsync(reaction.Emote, reaction.User.Value);
                 }
 
                 return Task.CompletedTask;
             }
-            
-            if (arg3.User.IsSpecified && arg3.User.Value != null && !oldContent.Contains(NicknameOrFull((SocketGuildUser)arg3.User.Value)) && arg3.Emote.Name == confirmEmoji.Name)
+
+            if (reaction.User.IsSpecified && reaction.User.Value != null && !oldContent.Contains(NicknameOrFull((SocketGuildUser)reaction.User.Value)) && reaction.Emote.Name == confirmEmoji.Name)
             {
-                PostConsoleLine("Reaction added to comment from user " + arg3.User.Value);
-                await message.ModifyAsync((x) => x.Content = oldContent + "\n**" + ((SocketGuildUser)arg3.User.Value).Nickname + "**");
+                PostConsoleLine("Reaction added to comment from user " + reaction.User.Value);
+                await message.ModifyAsync((x) => x.Content = oldContent + "\n**" + (NicknameOrFull((SocketGuildUser)reaction.User.Value) + "**"));
             }
             else
             {
-                PostConsoleLine("User is " + (arg3.User.IsSpecified ? "specified" : "not specified, ") + "and is " + arg3.User.Value);
+                PostConsoleLine("User is " + (reaction.User.IsSpecified ? "specified" : "not specified, ") + "and is " + reaction.User.Value);
             }
             var enoughPeople = message.Reactions[confirmEmoji].ReactionCount > 9;
             if (enoughPeople)
