@@ -7,9 +7,11 @@ using Discord.WebSocket;
 using System.IO;
 using Discord.Rest;
 using Newtonsoft.Json;
+using System.Threading;
 
 namespace DiscordMessagePostBot
 {
+    //TODO:Make Dictionary of <messageID, users> to allow more complex message text (e.g. to list users that are maybes as well as confirmed)
     class Program
     {
         bool ready = false;
@@ -116,8 +118,7 @@ namespace DiscordMessagePostBot
                                         var messageContent = messageToConfirm.Content;
                                         var userConfirmations = await messageToConfirm.GetReactionUsersAsync(confirmEmoji, 20).FlattenAsync();
                                         var reactionsList = userConfirmations.ToList();
-                                        var namesToAdd = new List<string>();
-                                        messageContent = messageContent.Replace("\n\n\n", "\n");
+                                        var namesToAdd = new List<string>();                                        
                                         foreach (var user in reactionsList)
                                         {
                                             var socketUser = guild.GetUser(user.Id);
@@ -132,6 +133,7 @@ namespace DiscordMessagePostBot
                                                 messageContent += "\n**" + NicknameOrFull(socketUser) + "**";
                                             }
                                         }
+                                        Thread.Sleep(10);
                                         await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
                                         var userWarnings = await messageToConfirm.GetReactionUsersAsync(maybeEmoji, 20).FlattenAsync();
                                         foreach (var user in userWarnings)
@@ -144,6 +146,7 @@ namespace DiscordMessagePostBot
                                                 messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
                                             }
                                         }
+                                        Thread.Sleep(10);
                                         var userCancels = await messageToConfirm.GetReactionUsersAsync(cancelEmoji, 20).FlattenAsync();
                                         foreach (var user in userCancels)
                                         {
@@ -162,6 +165,7 @@ namespace DiscordMessagePostBot
                                     messageDates.Add(DateTime.MinValue + TimeSpan.FromDays(50));
                                 }
                                 index--;
+                                Thread.Sleep(10);
                             }
                             if (!hadToAddReactions)
                             {
@@ -198,7 +202,7 @@ namespace DiscordMessagePostBot
                             }
                         }
                     }
-                    System.Threading.Thread.Sleep(100);
+                    Thread.Sleep(100);
                 }
             }
             catch (Exception e)
@@ -208,7 +212,7 @@ namespace DiscordMessagePostBot
             }
         }
 
-        private string NicknameOrFull(SocketGuildUser user)
+        private string NicknameOrFull(IGuildUser user)
         {
             return !string.IsNullOrEmpty(user.Nickname) ? user.Nickname : user.Username.Split('#')[0];
         }
@@ -253,9 +257,15 @@ namespace DiscordMessagePostBot
 
                 return Task.CompletedTask;
             }
-            if (arg3.User.IsSpecified && !oldContent.Contains(((IGuildUser)arg3.User.Value).Nickname) && arg3.Emote.Name == confirmEmoji.Name)
+            
+            if (arg3.User.IsSpecified && arg3.User.Value != null && !oldContent.Contains(NicknameOrFull((SocketGuildUser)arg3.User.Value)) && arg3.Emote.Name == confirmEmoji.Name)
             {
-                await message.ModifyAsync((x) => x.Content = oldContent + "\n**" + ((IGuildUser)arg3.User.Value).Nickname + "**");
+                PostConsoleLine("Reaction added to comment from user " + arg3.User.Value);
+                await message.ModifyAsync((x) => x.Content = oldContent + "\n**" + ((SocketGuildUser)arg3.User.Value).Nickname + "**");
+            }
+            else
+            {
+                PostConsoleLine("User is " + (arg3.User.IsSpecified ? "specified" : "not specified, ") + "and is " + arg3.User.Value);
             }
             var enoughPeople = message.Reactions[confirmEmoji].ReactionCount > 9;
             if (enoughPeople)
