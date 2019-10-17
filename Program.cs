@@ -26,7 +26,7 @@ namespace DiscordMessagePostBot
         List<SocketUser> usersToNotify = new List<SocketUser>();
         SocketGuild guild;
         SocketTextChannel confirmationChannel;
-
+        StreamWriter logFile;
         Settings settings;
         static void Main(string[] args)
         {
@@ -37,6 +37,9 @@ namespace DiscordMessagePostBot
         {
             try
             {
+                var log = File.OpenWrite("log.txt");                
+                logFile = new StreamWriter(log);
+                
                 try
                 {
                     if (File.Exists("settings.json"))
@@ -96,7 +99,7 @@ namespace DiscordMessagePostBot
                         pressedC = false;
                         lastCheckedTime = DateTime.Now;
                         if (ready)
-                        {
+                        {                            
                             var messages = await confirmationChannel.GetMessagesAsync(numMessagesToGrab).FlattenAsync();
                             PostConsoleLine("Got last " + numMessagesToGrab + " messages");
                             var messageList = messages.ToList();
@@ -209,6 +212,8 @@ namespace DiscordMessagePostBot
             catch (Exception e)
             {
                 PostConsoleLine("Error occurred: " + e.Message + "\nStack Trace:\n" + e.StackTrace, true);
+                logFile.WriteLine(DateTime.Now.ToString("H:mm:ss") + " Closing program");
+                logFile.Close();
                 return Task.CompletedTask;
             }
         }
@@ -296,6 +301,8 @@ namespace DiscordMessagePostBot
         async Task<Task> LogMessage(LogMessage log)
         {
             Console.WriteLine(log.ToString());
+            logFile.WriteLine(log.ToString());
+            logFile.Flush();
             return Task.CompletedTask;
         }
 
@@ -308,7 +315,11 @@ namespace DiscordMessagePostBot
                     channel.SendMessageAsync(message);
                 }
             }
-            Console.WriteLine(DateTime.Now.ToString("H:mm:ss") + " " + message);
+            var datedString = DateTime.Now.ToString("H:mm:ss") + " " + message;
+            Console.WriteLine(datedString);
+            logFile.WriteLine(datedString);
+            logFile.Flush();
+
         }
     }
 }
