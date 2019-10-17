@@ -139,11 +139,11 @@ namespace DiscordMessagePostBot
                                         foreach (var user in userWarnings)
                                         {
                                             var socketUser = guild.GetUser(user.Id);
-                                            if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
+                                            if (names.Contains("**" + NicknameOrFull(socketUser) + "**") && (user.Id != botAPI.CurrentUser.Id))
                                             {
                                                 hadToAddReactions = true;
                                                 PostConsoleLine("Found warning that wasn't edited out by " + NicknameOrFull(socketUser));
-                                                messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
+                                                messageContent = messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
                                             }
                                         }
                                         Thread.Sleep(100);
@@ -151,11 +151,11 @@ namespace DiscordMessagePostBot
                                         foreach (var user in userCancels)
                                         {
                                             var socketUser = guild.GetUser(user.Id);
-                                            if (names.Contains(NicknameOrFull(socketUser)) && (user.Id != botAPI.CurrentUser.Id))
+                                            if (names.Contains("**" + NicknameOrFull(socketUser) + "**") && (user.Id != botAPI.CurrentUser.Id))
                                             {
                                                 hadToAddReactions = true;
                                                 PostConsoleLine("Found X that wasn't edited out by " + NicknameOrFull(socketUser));
-                                                messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
+                                                messageContent = messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
                                             }
                                         }
                                         await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
