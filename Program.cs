@@ -26,7 +26,6 @@ namespace DiscordMessagePostBot
         List<SocketUser> usersToNotify = new List<SocketUser>();
         SocketGuild guild;
         SocketTextChannel confirmationChannel;
-        StreamWriter logFile;
         Settings settings;
         static void Main(string[] args)
         {
@@ -37,9 +36,8 @@ namespace DiscordMessagePostBot
         {
             try
             {
-                var log = File.OpenWrite("log.txt");                
-                logFile = new StreamWriter(log);
-                
+
+
                 try
                 {
                     if (File.Exists("settings.json"))
@@ -63,20 +61,20 @@ namespace DiscordMessagePostBot
                 }
                 catch (FormatException e)
                 {
-                    PostConsoleLine("Error parsing guild or channel IDs. Please make sure they're on their own lines with no other characters");
+                    await LogMessage("Error parsing guild or channel IDs. Please make sure they're on their own lines with no other characters");
                     return Task.CompletedTask;
                 }
                 catch (Exception e)
                 {
-                    PostConsoleLine("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe");
+                    await LogMessage("Error reading key file! Please make sure you have a file named key.txt in the same directory as the exe");
 
                     return Task.CompletedTask;
                 }
                 await botAPI.LoginAsync(TokenType.Bot, settings.key);
                 await botAPI.StartAsync();
                 botAPI.Ready += ClientReady;
-                botAPI.Log += LogMessage;
-                PostConsoleLine("Login Status is " + botAPI.LoginState);
+                botAPI.Log += APILog;
+                await LogMessage("Login Status is " + botAPI.LoginState);
                 await botAPI.SetStatusAsync(UserStatus.Online);
                 botAPI.ReactionAdded += ReactionAdded;
                 botAPI.ReactionRemoved += ReactionRemoved;
@@ -99,13 +97,13 @@ namespace DiscordMessagePostBot
                         pressedC = false;
                         lastCheckedTime = DateTime.Now;
                         if (ready)
-                        {                            
+                        {
                             var messages = await confirmationChannel.GetMessagesAsync(numMessagesToGrab).FlattenAsync();
-                            PostConsoleLine("Got last " + numMessagesToGrab + " messages");
+                            await LogMessage("Got last " + numMessagesToGrab + " messages");
                             var messageList = messages.ToList();
                             var messageDates = new List<DateTime>(messageList.Count);
                             var index = messageList.Count - 1;
-                            PostConsoleLine("Checking message for new reactions");
+                            await LogMessage("Checking message for new reactions");
                             var hadToAddReactions = false;
                             foreach (var listMessage in messageList)
                             {
@@ -132,7 +130,7 @@ namespace DiscordMessagePostBot
                                                 {
                                                     messageContent = messageContent.Replace("\n" + NicknameOrFull(socketUser), "");
                                                 }
-                                                PostConsoleLine("Found confirmation that wasn't edited in by " + NicknameOrFull(socketUser));
+                                                await LogMessage("Found confirmation that wasn't edited in by " + NicknameOrFull(socketUser));
                                                 messageContent += "\n**" + NicknameOrFull(socketUser) + "**";
                                             }
                                         }
@@ -145,7 +143,7 @@ namespace DiscordMessagePostBot
                                             if (names.Contains("**" + NicknameOrFull(socketUser) + "**") && (user.Id != botAPI.CurrentUser.Id))
                                             {
                                                 hadToAddReactions = true;
-                                                PostConsoleLine("Found warning that wasn't edited out by " + NicknameOrFull(socketUser));
+                                                await LogMessage("Found warning that wasn't edited out by " + NicknameOrFull(socketUser));
                                                 messageContent = messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
                                             }
                                         }
@@ -157,7 +155,7 @@ namespace DiscordMessagePostBot
                                             if (names.Contains("**" + NicknameOrFull(socketUser) + "**") && (user.Id != botAPI.CurrentUser.Id))
                                             {
                                                 hadToAddReactions = true;
-                                                PostConsoleLine("Found X that wasn't edited out by " + NicknameOrFull(socketUser));
+                                                await LogMessage("Found X that wasn't edited out by " + NicknameOrFull(socketUser));
                                                 messageContent = messageContent.Replace("\n**" + NicknameOrFull(socketUser) + "**", "");
                                             }
                                         }
@@ -173,10 +171,10 @@ namespace DiscordMessagePostBot
                             }
                             if (!hadToAddReactions)
                             {
-                                PostConsoleLine("Already caught up on reactions");
+                                await LogMessage("Already caught up on reactions");
                             }
 
-                            PostConsoleLine("Checking whether to post new date");
+                            await LogMessage("Checking whether to post new date");
                             if ((messageDates.Max() - settings.numberOfDaysAhead) < DateTime.Now.Date)
                             {
                                 Console.Write("Most recent date is " + messageDates.Max().ToString(dateFormat));
@@ -202,7 +200,7 @@ namespace DiscordMessagePostBot
 
                             else
                             {
-                                PostConsoleLine("Already caught up on messages, waiting " + timeToCheck.ToString("%m") + " minutes before checking again");
+                                await LogMessage("Already caught up on messages, waiting " + timeToCheck.ToString("%m") + " minutes before checking again");
                             }
                         }
                     }
@@ -211,9 +209,8 @@ namespace DiscordMessagePostBot
             }
             catch (Exception e)
             {
-                PostConsoleLine("Error occurred: " + e.Message + "\nStack Trace:\n" + e.StackTrace, true);
-                logFile.WriteLine(DateTime.Now.ToString("H:mm:ss") + " Closing program");
-                logFile.Close();
+                await LogMessage("Error occurred: " + e.Message + "\nStack Trace:\n" + e.StackTrace, true, true);
+                await LogMessage("Closing program");
                 return Task.CompletedTask;
             }
         }
@@ -256,7 +253,7 @@ namespace DiscordMessagePostBot
 
             if (reaction.Emote.Name != confirmEmoji.Name && reaction.Emote.Name != maybeEmoji.Name && reaction.Emote.Name != cancelEmoji.Name)
             {
-                PostConsoleLine("The emoji wasn't valid");
+                await LogMessage("The emoji wasn't valid");
                 if (reaction.User.IsSpecified)
                 {
                     await message.RemoveReactionAsync(reaction.Emote, reaction.User.Value);
@@ -267,12 +264,12 @@ namespace DiscordMessagePostBot
 
             if (reaction.User.IsSpecified && reaction.User.Value != null && !oldContent.Contains(NicknameOrFull((SocketGuildUser)reaction.User.Value)) && reaction.Emote.Name == confirmEmoji.Name)
             {
-                PostConsoleLine("Reaction added to comment from user " + reaction.User.Value);
+                await LogMessage("Reaction added to comment from user " + reaction.User.Value);
                 await message.ModifyAsync((x) => x.Content = oldContent + "\n**" + (NicknameOrFull((SocketGuildUser)reaction.User.Value) + "**"));
             }
             else
             {
-                PostConsoleLine("User is " + (reaction.User.IsSpecified ? "specified" : "not specified, ") + "and is " + reaction.User.Value);
+                await LogMessage("User is " + (reaction.User.IsSpecified ? "specified" : "not specified, ") + "and is " + reaction.User.Value);
             }
             var enoughPeople = message.Reactions[confirmEmoji].ReactionCount > 9;
             if (enoughPeople)
@@ -285,11 +282,11 @@ namespace DiscordMessagePostBot
         private async Task<Task> ClientReady()
         {
             ready = true;
-            PostConsoleLine("Client is ready");
+            await LogMessage("Client is ready");
             guild = botAPI.GetGuild(settings.guildId);
-            PostConsoleLine("Got guild with name " + guild.Name);
+            await LogMessage("Got guild with name " + guild.Name);
             confirmationChannel = guild.GetTextChannel(settings.confirmationChannelId);
-            PostConsoleLine("Got channel " + confirmationChannel.Name);
+            await LogMessage("Got channel " + confirmationChannel.Name);
             foreach (var chan in settings.usersToNotifyIds)
             {
                 usersToNotify.Add(botAPI.GetUser(chan));
@@ -298,28 +295,30 @@ namespace DiscordMessagePostBot
             return Task.CompletedTask;
         }
 
-        async Task<Task> LogMessage(LogMessage log)
+        async Task<Task> APILog(LogMessage log)
         {
-            Console.WriteLine(log.ToString());
-            logFile.WriteLine(log.ToString());
-            logFile.Flush();
+            await LogMessage(log.ToString(), false);
             return Task.CompletedTask;
         }
 
-        void PostConsoleLine(string message, bool postMessageToDiscordLog = false)
+        async Task LogMessage(string message, bool prependDate = true, bool postMessageToDiscordLog = false)
         {
+            var logFile = new StreamWriter("log.txt");
             if (postMessageToDiscordLog)
             {
                 foreach (var channel in usersToNotify)
                 {
-                    channel.SendMessageAsync(message);
+                    await channel.SendMessageAsync(message);
                 }
             }
-            var datedString = DateTime.Now.ToString("H:mm:ss") + " " + message;
-            Console.WriteLine(datedString);
-            logFile.WriteLine(datedString);
-            logFile.Flush();
-
+            string logMessage = message;
+            if (prependDate)
+            {
+                logMessage = logMessage.Insert(0, DateTime.Now.ToString("H:mm:ss") + " ");
+            }
+            Console.WriteLine(logMessage);
+            await logFile.WriteLineAsync(logMessage);
+            logFile.Close();
         }
     }
 }
