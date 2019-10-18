@@ -32,6 +32,20 @@ namespace DiscordMessagePostBot
             new Program().MainAsync().GetAwaiter().GetResult();
         }
 
+        async Task<bool> SaveSettings()
+        {
+            try
+            {
+                File.WriteAllText("settings.json", JsonConvert.SerializeObject(settings, Formatting.Indented));
+            }
+            catch (Exception e)
+            {
+                await LogMessage("Error when attempting to save settings: " + e.Message + "\nStack Trace:" + e.StackTrace);
+            }
+            await LogMessage("Settings saved");
+            return true;
+        }
+
         async Task<bool> LoadOrCreateSettings()
         {
             try
@@ -91,6 +105,10 @@ namespace DiscordMessagePostBot
                         {
                             pressedC = true;
                         }
+                        if (cKey == ConsoleKey.S)
+                        {
+                            await SaveSettings();
+                        }
                     }
                     if ((DateTime.Now) - lastCheckedTime > timeToCheck || pressedC)
                     {
@@ -126,23 +144,18 @@ namespace DiscordMessagePostBot
             if ((messageDates.Max() - settings.numberOfDaysAhead) < DateTime.Now.Date)
             {
                 Console.Write("Most recent date is " + messageDates.Max().ToString(dateFormat));
-                DateTime startDate = DateTime.MinValue;
-                if (messageDates.Max().Date < DateTime.Now.Date)
+                foreach (var time in settings.raidTimes)
                 {
-                    startDate = DateTime.Now.Date;
-                }
-                else
-                {
-                    startDate = messageDates.Max();
-                }
-                startDate = startDate.Date;
-                startDate = startDate.AddHours(18.5f);
-                while ((startDate.Date < (DateTime.Now + settings.numberOfDaysAhead).Date))
-                {
-                    startDate = startDate.AddDays(1);
-                    var newDate = startDate.ToString(dateFormat);
-                    var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:\n");
-                    await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, cancelEmoji });
+                    if (time != TimeSpan.Zero && time < TimeSpan.FromDays(7))
+                    {
+                        var dayToCheck = DateTime.Now.StartOfWeek(DayOfWeek.Sunday) + time;
+                        if (dayToCheck.Date < (DateTime.Now + settings.numberOfDaysAhead).Date)
+                        {
+                            var newDate = dayToCheck.ToString(dateFormat);
+                            var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:");
+                            await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, cancelEmoji });
+                        }
+                    }
                 }
             }
 
@@ -354,6 +367,14 @@ namespace DiscordMessagePostBot
                 Console.WriteLine(logMessage);
                 await logFile.WriteLineAsync(logMessage);
             }
+        }
+    }
+    public static class DateTimeExtensions
+    {
+        public static DateTime StartOfWeek(this DateTime dt, DayOfWeek startOfWeek)
+        {
+            int diff = (7 + (dt.DayOfWeek - startOfWeek)) % 7;
+            return dt.AddDays(-1 * diff).Date;
         }
     }
 }
