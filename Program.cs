@@ -141,22 +141,34 @@ namespace DiscordMessagePostBot
 
         private async Task<Task> NewMessageCheck(TimeSpan timeToCheck, List<DateTime> messageDates)
         {
+            TimeSpan testSpan = new TimeSpan();
+            await LogMessage("TestTimeSpan is " + testSpan.ToString());
             if ((messageDates.Max() - settings.numberOfDaysAhead) < DateTime.Now.Date)
             {
                 Console.Write("Most recent date is " + messageDates.Max().ToString(dateFormat));
-                foreach (var time in settings.raidTimes)
+
+                for (var currentDate = messageDates.Max().Date.AddDays(1); currentDate < (DateTime.Now + settings.numberOfDaysAhead).Date.AddDays(1); currentDate = currentDate.AddDays(1))
                 {
-                    if (time != TimeSpan.Zero && time < TimeSpan.FromDays(7))
+                    var time = settings.raidTimes.FirstOrDefault(x => x.Item1 == currentDate.DayOfWeek)?.Item2;
+                    if (time.HasValue && time != default(TimeSpan))
                     {
-                        var dayToCheck = DateTime.Now.StartOfWeek(DayOfWeek.Sunday) + time;
-                        if (dayToCheck.Date < (DateTime.Now + settings.numberOfDaysAhead).Date)
-                        {
-                            var newDate = dayToCheck.ToString(dateFormat);
-                            var newMessage = await confirmationChannel.SendMessageAsync(newDate + "\nPeople Confirmed:");
-                            await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, cancelEmoji });
-                        }
+                        var messageDate = (currentDate + time.Value).ToString(dateFormat);
+                        var newMessage = await confirmationChannel.SendMessageAsync(messageDate + "\nPeople Confirmed:");
+                        await newMessage.AddReactionsAsync(new[] { confirmEmoji, maybeEmoji, cancelEmoji });
                     }
+
                 }
+                //foreach (var time in settings.raidTimes)
+                //{
+                //    if (time != TimeSpan.Zero && time < TimeSpan.FromDays(7))
+                //    {
+                //        var dayToCheck = DateTime.Now.StartOfWeek(DayOfWeek.Sunday) + time;
+                //        if (dayToCheck.Date < (DateTime.Now + settings.numberOfDaysAhead).Date && dayToCheck.Date > DateTime.Now.Date)
+                //        {
+                //            
+                //        }
+                //    }
+                //}
             }
 
             else
@@ -214,6 +226,7 @@ namespace DiscordMessagePostBot
                         {
                             messageContent = messageContent.Replace(name, "");
                         }
+                        messageContent = messageContent.Replace("\n**RaidConfirmationsBot**", "");
                         var splits = messageContent.Split('\n');
                         var uniques = splits.Distinct();
                         messageContent = "";
@@ -293,6 +306,8 @@ namespace DiscordMessagePostBot
             var message = await messagePromise.GetOrDownloadAsync();
 
             if (message.Author.Id != botAPI.CurrentUser.Id)
+            { return Task.CompletedTask; }
+            if (reaction.User.IsSpecified && reaction.UserId == botAPI.CurrentUser.Id)
             { return Task.CompletedTask; }
             var oldContent = message.Content;
 

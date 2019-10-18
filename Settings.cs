@@ -12,15 +12,17 @@ namespace DiscordMessagePostBot
         public ulong confirmationChannelId = 0;
         public List<ulong> usersToNotifyIds = new List<ulong>();
         public TimeSpan numberOfDaysAhead = TimeSpan.FromDays(7);
-        public TimeSpan[] raidTimes = new TimeSpan[7];
+        public Tuple<DayOfWeek, TimeSpan>[] raidTimes = new Tuple<DayOfWeek, TimeSpan>[7];
 
         public Settings()
         {
-            raidTimes = new TimeSpan[]{
-                TimeSpan.FromHours(18.5f), TimeSpan.FromHours(42.5f),
-                TimeSpan.FromHours(66.5f),TimeSpan.FromHours(90.5f),
-                TimeSpan.FromHours(114.5f), TimeSpan.FromHours(138.5),
-                TimeSpan.FromHours(162.5f)};
+            raidTimes = new Tuple<DayOfWeek, TimeSpan>[]{Tuple.Create(DayOfWeek.Sunday, TimeSpan.FromHours(18.5f) ), 
+                Tuple.Create(DayOfWeek.Monday, TimeSpan.FromHours(18.5f)),
+                Tuple.Create(DayOfWeek.Tuesday, TimeSpan.FromHours(18.5f)),
+                Tuple.Create(DayOfWeek.Wednesday, TimeSpan.FromHours(18.5f)),
+                Tuple.Create(DayOfWeek.Thursday, TimeSpan.FromHours(18.5f)),
+                Tuple.Create(DayOfWeek.Friday, TimeSpan.FromHours(18.5f)),
+                Tuple.Create(DayOfWeek.Saturday, TimeSpan.FromHours(18.5f))};
         }
     }
 }
