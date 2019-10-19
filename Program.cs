@@ -197,7 +197,7 @@ namespace DiscordMessagePostBot
                         var userConfirmations = await messageToConfirm.GetReactionUsersAsync(confirmEmoji, 20).FlattenAsync();
                         var namesToAdd = new List<string>();
                         var namesToRemove = new List<string>();
-                        var confirmedNames = await CheckIfUserReacted(userConfirmations, names);
+                        var confirmedNames = await CheckIfUserReacted(userConfirmations, names, true);
                         foreach (var userName in confirmedNames)
                         {
                             namesToAdd.Add(userName);
@@ -261,15 +261,18 @@ namespace DiscordMessagePostBot
             return Task.CompletedTask;
         }
 
-        async Task<List<string>> CheckIfUserReacted(IEnumerable<IUser> users, IEnumerable<string> names)
+        async Task<List<string>> CheckIfUserReacted(IEnumerable<IUser> users, IEnumerable<string> names, bool isAdding = false)
         {
             var namesToModify = new List<string>();
             foreach (var user in users)
             {
                 var socketUser = guild.GetUser(user.Id);
-                if (names.Contains("\n**" + NicknameOrFull(socketUser) + "**") && (user.Id != botAPI.CurrentUser.Id))
+                var addRemoveName = names.Contains("**" + NicknameOrFull(socketUser) + "**") && (user.Id != botAPI.CurrentUser.Id);
+                var addAddName = !names.Contains("**" + NicknameOrFull(socketUser) + "**") && (user.Id != botAPI.CurrentUser.Id);
+                var shouldAddName = isAdding ? addAddName : addRemoveName;
+                if (shouldAddName)
                 {
-                    await LogMessage("Found X that wasn't edited out by " + NicknameOrFull(socketUser));
+                    await LogMessage("Found X that wasn't edited by " + NicknameOrFull(socketUser));
                     namesToModify.Add("\n**" + NicknameOrFull(socketUser) + "**");
                 }
             }
