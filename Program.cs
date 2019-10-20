@@ -198,6 +198,14 @@ namespace DiscordMessagePostBot
                         var namesToAdd = new List<string>();
                         var namesToRemove = new List<string>();
                         var confirmedNames = await CheckIfUserReacted(userConfirmations, names, true);
+                        if (userConfirmations.Count() > 8)
+                        {
+                            await messageToConfirm.AddReactionAsync(goodToGo);
+                        }
+                        else if (messageToConfirm.Reactions.ContainsKey(goodToGo))
+                        {
+                            await messageToConfirm.RemoveReactionAsync(goodToGo, botAPI.CurrentUser);
+                        }
                         foreach (var userName in confirmedNames)
                         {
                             namesToAdd.Add(userName);
