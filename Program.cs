@@ -133,7 +133,7 @@ namespace DiscordMessagePostBot
             }
             catch (Exception e)
             {
-                await LogMessage("Error occurred: " + e.Message + "\nStack Trace:\n" + e.StackTrace, true, true);
+                await LogMessage("Error occurred: " + e.Message + "\nStack Trace:\n" + e.StackTrace, LogDateType.DateTime, true);
                 await LogMessage("Closing program");
                 return Task.CompletedTask;
             }
@@ -142,7 +142,6 @@ namespace DiscordMessagePostBot
         private async Task<Task> NewMessageCheck(TimeSpan timeToCheck, List<DateTime> messageDates)
         {
             TimeSpan testSpan = new TimeSpan();
-            await LogMessage("TestTimeSpan is " + testSpan.ToString());
             if ((messageDates.Max() - settings.numberOfDaysAhead) < DateTime.Now.Date)
             {
                 Console.Write("Most recent date is " + messageDates.Max().ToString(dateFormat));
@@ -158,17 +157,6 @@ namespace DiscordMessagePostBot
                     }
 
                 }
-                //foreach (var time in settings.raidTimes)
-                //{
-                //    if (time != TimeSpan.Zero && time < TimeSpan.FromDays(7))
-                //    {
-                //        var dayToCheck = DateTime.Now.StartOfWeek(DayOfWeek.Sunday) + time;
-                //        if (dayToCheck.Date < (DateTime.Now + settings.numberOfDaysAhead).Date && dayToCheck.Date > DateTime.Now.Date)
-                //        {
-                //            
-                //        }
-                //    }
-                //}
             }
 
             else
@@ -181,89 +169,108 @@ namespace DiscordMessagePostBot
 
         private async Task<Task> CheckForReactions(List<IMessage> messageList, List<DateTime> messageDates, int index)
         {
-            var hadToAddReactions = false;
-            foreach (var listMessage in messageList)
+            try
             {
-                var isSuccessful = DateTime.TryParseExact(listMessage.Content.Split('\n')[0], dateFormat, null, System.Globalization.DateTimeStyles.None, out DateTime date);
-                if (isSuccessful)
+                var hadToAddReactions = false;
+                foreach (var listMessage in messageList)
                 {
-                    messageDates.Add(date);
-                    var names = listMessage.Content.Split('\n');
-                    var messageToConfirm = (await confirmationChannel.GetMessageAsync(listMessage.Id) as RestUserMessage);
 
-                    if (messageToConfirm != null && messageToConfirm.Reactions.ContainsKey(confirmEmoji))
+                    var isSuccessful = DateTime.TryParseExact(listMessage.Content.Split('\n')[0], dateFormat, null, System.Globalization.DateTimeStyles.None, out DateTime date);
+                    if (isSuccessful)
                     {
-                        var messageContent = messageToConfirm.Content;
-                        var userConfirmations = await messageToConfirm.GetReactionUsersAsync(confirmEmoji, 20).FlattenAsync();
-                        var namesToAdd = new List<string>();
-                        var namesToRemove = new List<string>();
-                        var confirmedNames = await CheckIfUserReacted(userConfirmations, names, true);
-                        if (userConfirmations.Count() > 8)
-                        {
-                            await messageToConfirm.AddReactionAsync(goodToGo);
-                        }
-                        else if (messageToConfirm.Reactions.ContainsKey(goodToGo))
-                        {
-                            await messageToConfirm.RemoveReactionAsync(goodToGo, botAPI.CurrentUser);
-                        }
-                        foreach (var userName in confirmedNames)
-                        {
-                            namesToAdd.Add(userName);
-                        }
-                        Thread.Sleep(100);
+                        messageDates.Add(date);
+                        var names = listMessage.Content.Split('\n');
+                        var messageToConfirm = (await confirmationChannel.GetMessageAsync(listMessage.Id) as RestUserMessage);
 
-                        var userWarnings = await messageToConfirm.GetReactionUsersAsync(maybeEmoji, 20).FlattenAsync();
-                        var warningNames = await CheckIfUserReacted(userWarnings, names);
-                        foreach (var userName in warningNames)
+                        if (messageToConfirm != null && messageToConfirm.Reactions.ContainsKey(confirmEmoji))
                         {
-                            namesToRemove.Add(userName);
-                        }
-                        Thread.Sleep(100);
-                        var userCancels = await messageToConfirm.GetReactionUsersAsync(cancelEmoji, 20).FlattenAsync();
-                        var cancelNames = await CheckIfUserReacted(userCancels, names);
-                        foreach (var userName in cancelNames)
-                        {
-                            namesToRemove.Add(userName);
-                        }
-                        hadToAddReactions = namesToAdd.Count > 0 || namesToRemove.Count > 0;
-                        foreach (var name in namesToAdd)
-                        {
-                            messageContent += name;
-                        }
-                        foreach (var name in namesToRemove)
-                        {
-                            messageContent = messageContent.Replace(name, "");
-                        }
-                        messageContent = messageContent.Replace("\n**RaidConfirmationsBot**", "");
-                        var splits = messageContent.Split('\n');
-                        var uniques = splits.Distinct();
-                        messageContent = "";
-                        var i = 0;
-                        foreach (var str in uniques)
-                        {
-                            if (i > 0)
+
+                            var messageContent = messageToConfirm.Content;
+                            var userConfirmations = await messageToConfirm.GetReactionUsersAsync(confirmEmoji, 20).FlattenAsync();
+                            var namesToAdd = new List<string>();
+                            var namesToRemove = new List<string>();
+                            var confirmedNames = await CheckIfUserReacted(userConfirmations, names, true);
+                            if (userConfirmations.Count() > 8)
                             {
-                                messageContent += "\n" + str;
+                                await messageToConfirm.AddReactionAsync(goodToGo);
                             }
-                            else
+                            else if (messageToConfirm.Reactions.ContainsKey(goodToGo))
                             {
-                                messageContent += str;
+                                await messageToConfirm.RemoveReactionAsync(goodToGo, botAPI.CurrentUser);
                             }
-                            i++;
+                            foreach (var userName in confirmedNames)
+                            {
+                                namesToAdd.Add(userName);
+                            }
+                            Thread.Sleep(100);
+
+                            var userWarnings = await messageToConfirm.GetReactionUsersAsync(maybeEmoji, 20).FlattenAsync();
+                            var warningNames = await CheckIfUserReacted(userWarnings, names);
+                            foreach (var userName in warningNames)
+                            {
+                                namesToRemove.Add(userName);
+                            }
+                            Thread.Sleep(100);
+                            var userCancels = await messageToConfirm.GetReactionUsersAsync(cancelEmoji, 20).FlattenAsync();
+                            var cancelNames = await CheckIfUserReacted(userCancels, names);
+                            foreach (var userName in cancelNames)
+                            {
+                                namesToRemove.Add(userName);
+                            }
+                            hadToAddReactions = namesToAdd.Count > 0 || namesToRemove.Count > 0;
+                            for (int i1 = 0; i1 < namesToRemove.Count; i1++)
+                            {
+                                string name = namesToRemove[i1];
+                                if (userConfirmations.Any(x => name == ("\n**" + NicknameOrFull(guild.GetUser(x.Id)) + "**")))
+                                {
+                                    namesToRemove.RemoveAt(i1);
+                                    i1--;
+                                }
+                            }
+                            foreach (var name in namesToRemove)
+                            {
+                                messageContent = messageContent.Replace(name, "");
+                            }
+                            foreach (var name in namesToAdd)
+                            {
+                                messageContent += name;
+                            }
+
+                            var splits = messageContent.Split('\n');
+                            var uniques = splits.Distinct();
+                            messageContent = "";
+                            var i = 0;
+                            foreach (var str in uniques)
+                            {
+                                if (i > 0)
+                                {
+                                    messageContent += "\n" + str;
+                                }
+                                else
+                                {
+                                    messageContent += str;
+                                }
+                                i++;
+                            }
+                            await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
                         }
-                        await messageToConfirm.ModifyAsync(x => x.Content = messageContent);
                     }
+                    else
+                    {
+                        messageDates.Add(DateTime.MinValue + TimeSpan.FromDays(50));
+                    }
+                    index--;
+                    Thread.Sleep(100);
                 }
-                else
+                if (!hadToAddReactions)
                 {
-                    messageDates.Add(DateTime.MinValue + TimeSpan.FromDays(50));
+                    await LogMessage("Caught up on reactions");
                 }
-                index--;
-                Thread.Sleep(100);
+
             }
-            if (!hadToAddReactions)
+            catch (Exception e)
             {
-                await LogMessage("Caught up on reactions");
+                await LogMessage("Error Occurred: " + e.Message + "\n" + e.StackTrace);
             }
 
             return Task.CompletedTask;
@@ -280,7 +287,7 @@ namespace DiscordMessagePostBot
                 var shouldAddName = isAdding ? addAddName : addRemoveName;
                 if (shouldAddName)
                 {
-                    await LogMessage("Found X that wasn't edited by " + NicknameOrFull(socketUser));
+                    await LogMessage("Found " + (isAdding ? "confirmation" : "X or warning") + " that wasn't edited by " + NicknameOrFull(socketUser));
                     namesToModify.Add("\n**" + NicknameOrFull(socketUser) + "**");
                 }
             }
@@ -370,11 +377,11 @@ namespace DiscordMessagePostBot
 
         async Task<Task> APILog(LogMessage log)
         {
-            await LogMessage(log.ToString(), false);
+            await LogMessage(log.ToString(), LogDateType.DateOnly);
             return Task.CompletedTask;
         }
 
-        async Task LogMessage(string message, bool prependDate = true, bool postMessageToDiscordLog = false)
+        async Task LogMessage(string message, LogDateType prependDate = LogDateType.DateTime, bool postMessageToDiscordLog = false)
         {
             using (var logFile = new StreamWriter("log.txt", true))
             {
@@ -386,9 +393,20 @@ namespace DiscordMessagePostBot
                     }
                 }
                 string logMessage = message;
-                if (prependDate)
+                switch (prependDate)
                 {
-                    logMessage = logMessage.Insert(0, DateTime.Now.ToString("H:mm:ss") + " ");
+                    case (LogDateType.DateOnly):
+                        {
+                            logMessage = logMessage.Insert(0, DateTime.Now.ToString("MMMM dd -") + " ");
+                            break;
+
+                        }
+                    case (LogDateType.DateTime):
+                        {
+                            logMessage = logMessage.Insert(0, DateTime.Now.ToString("MMMM dd - H:mm:ss") + " ");
+                            break;
+                        }
+
                 }
                 Console.WriteLine(logMessage);
                 await logFile.WriteLineAsync(logMessage);
@@ -402,5 +420,12 @@ namespace DiscordMessagePostBot
             int diff = (7 + (dt.DayOfWeek - startOfWeek)) % 7;
             return dt.AddDays(-1 * diff).Date;
         }
+    }
+
+    public enum LogDateType
+    {
+        None,
+        DateOnly,
+        DateTime
     }
 }
