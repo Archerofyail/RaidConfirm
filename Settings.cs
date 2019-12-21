@@ -24,5 +24,23 @@ namespace DiscordMessagePostBot
                 Tuple.Create(DayOfWeek.Friday, TimeSpan.FromHours(18.5f)),
                 Tuple.Create(DayOfWeek.Saturday, TimeSpan.FromHours(18.5f))};
         }
+
+        public override string ToString()
+        {
+            string finalstring = "";
+            finalstring += "Key is " + key + "\n";
+            finalstring += "Date Format is " + dateFormat + "\n";
+            finalstring += "Number of messages to check is " + numMessagesToGrab + "\n";
+            finalstring += "Number of days ahead is " + numberOfDaysAhead + "\n";
+            finalstring += "Guild ID is " + guildId + "\n";
+            finalstring += "Channel to post in is " + confirmationChannelId + "\n";
+            finalstring += "Users to notify about errors are " + usersToNotifyIds.ToString() + "\n";
+            finalstring += "Raid Times are " + "\n";
+            foreach (var raidTime in raidTimes)
+            {
+                finalstring += raidTime.Item1 + ", " + raidTime.Item2.ToString() + ";\n";
+            }
+            return finalstring;
+        }
     }
 }

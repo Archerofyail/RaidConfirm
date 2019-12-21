@@ -79,13 +79,16 @@ namespace DiscordMessagePostBot
 
         public async Task<Task> MainAsync()
         {
+            await LogMessage("Starting up...");
             try
             {
+
+                await LogMessage("Loaded settings...");
                 if (!await LoadOrCreateSettings())
                 {
                     return Task.CompletedTask;
                 }
-
+                await LogMessage("Settings are:\n" + settings.ToString());
                 await botAPI.LoginAsync(TokenType.Bot, settings.key);
                 await botAPI.StartAsync();
                 botAPI.Ready += ClientReady;
