@@ -27,9 +27,9 @@ namespace DiscordMessagePostBot
         SocketGuild guild;
         SocketTextChannel confirmationChannel;
         Settings settings;
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            new Program().MainAsync().GetAwaiter().GetResult();
+            await new Program().MainAsync();
         }
 
         async Task<bool> SaveSettings()

@@ -38,7 +38,7 @@ namespace DiscordMessagePostBot
             finalstring += "Raid Times are " + "\n";
             foreach (var raidTime in raidTimes)
             {
-                finalstring += raidTime.Item1 + ", " + raidTime.Item2.ToString() + ";\n";
+                finalstring += raidTime.Item1 + ", " + raidTime.Item2.ToString() + "\n";
             }
             return finalstring;
         }
